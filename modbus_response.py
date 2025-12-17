@@ -12,6 +12,29 @@ class ModBusResponse:
         self.data = data
 
     @staticmethod
+    def get_response(sock) -> ModBusResponse:
+        mbap_resp = b''
+        while len(mbap_resp) < 7:
+            chunk = sock.recv(7 - len(mbap_resp))
+            if not chunk:
+                raise ConnectionError("Connection closed while reading MBAP header")
+            mbap_resp += chunk
+
+        # Unpack MBAP header to get remaining length
+        tid, pid, length_field, unit = struct.unpack('>HHHB', mbap_resp)
+        # length_field includes Unit ID (1) + remaining PDU bytes
+        remaining_pdu_len = length_field - 1
+        pdu_resp = b''
+        while len(pdu_resp) < remaining_pdu_len:
+            chunk = sock.recv(remaining_pdu_len - len(pdu_resp))
+            if not chunk:
+                raise ConnectionError("Connection closed while reading PDU")
+            pdu_resp += chunk
+
+        response = mbap_resp + pdu_resp
+        return __class__.from_bytes(response)
+
+    @staticmethod
     def from_bytes(response_bytes: bytes) -> 'ModBusResponse':
         if len(response_bytes) < 9:
             raise ValueError("Response too short")
@@ -38,5 +61,14 @@ class ModBusResponse:
             function_code,
             byte_count, data
         )
+
+    @property
+    def bytes(self) -> bytes:
+        return self.response_bytes
+
+    @property
+    def hex(self) -> str:
+        return self.bytes.hex()
+
     def __repr__(self):
         return f"ModBusResponse(transaction_id={self.transaction_id}, protocol_id={self.protocol_id}, length={self.length}, unit_id={self.unit_id}, function_code={self.function_code}, byte_count={self.byte_count}, data={self.data.hex()})"

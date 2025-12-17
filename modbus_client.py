@@ -6,8 +6,8 @@ import socket
 import struct
 from enum import Enum
 
-from ModBusRequest import ModBusRequest, RequestType
-from ModBusResponse import ModBusResponse
+from modbus_request import ModBusRequest, RequestType
+from modbus_response import ModBusResponse
 
 class ModBusClient():
     def __init__(self, host, port=502, unit_id=1, timeout=5):
@@ -15,7 +15,7 @@ class ModBusClient():
         self.port = port
         self.unit_id = unit_id
         self.timeout = timeout
-        self.socket = None
+        self.sock = None
 
     def connect(self):
         flag = True
@@ -36,28 +36,6 @@ class ModBusClient():
     def _parse_response(response: bytes) -> ModBusResponse:
         return ModBusResponse.from_bytes(response)
 
-    def get_response(self) -> bytes:
-        mbap_resp = b''
-        while len(mbap_resp) < 7:
-            chunk = self.sock.recv(7 - len(mbap_resp))
-            if not chunk:
-                raise ConnectionError("Connection closed while reading MBAP header")
-            mbap_resp += chunk
-
-        # Unpack MBAP header to get remaining length
-        tid, pid, length_field, unit = struct.unpack('>HHHB', mbap_resp)
-        # length_field includes Unit ID (1) + remaining PDU bytes
-        remaining_pdu_len = length_field - 1
-        pdu_resp = b''
-        while len(pdu_resp) < remaining_pdu_len:
-            chunk = self.sock.recv(remaining_pdu_len - len(pdu_resp))
-            if not chunk:
-                raise ConnectionError("Connection closed while reading PDU")
-            pdu_resp += chunk
-
-        response = mbap_resp + pdu_resp
-        return response
-
     def send_request(self, request: ModBusRequest, **kwargs) -> ModBusResponse:
         """
         Send a Modbus TCP Read Holding Registers (function 0x03) request and
@@ -69,12 +47,11 @@ class ModBusClient():
         """
 
         self.sock.sendall(request.bytes)
-        response_bytes = self.get_response()
+        response = ModBusResponse.get_response(self.sock)
         print("Sent (bytes):", request)
         print("Sent (hex):", request.hex)
-        print("Received (bytes):", response_bytes)
-        print("Received (hex):", response_bytes.hex())
-        return self._parse_response(response_bytes)
+        print("Received (bytes):", response.bytes)
+        print("Received (hex):", response.hex)
     
 
 if __name__ == "__main__":
@@ -82,8 +59,9 @@ if __name__ == "__main__":
     PORT = 502
     UNIT_ID = 1
     V = ModBusClient(HOST, port=PORT, unit_id=UNIT_ID)
-    V.connect()
+    print(V.connect())
     request = ModBusRequest(RequestType.readHoldingRegisters, start_register=1, count=4)
+    print(request)
     print(V.send_request(request))
     V.disconnect()
     # Read holding registers 1..4 (human numbering)
