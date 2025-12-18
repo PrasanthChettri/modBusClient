@@ -1,6 +1,8 @@
 import struct
 
 class ModBusResponse:
+    ## BYTE_ORDER is BIG ENDIAN
+    VAL_SIZE = 2 # Size of each register value in bytes # 16 bit data per register
     def __init__(self, bytes, transaction_id: int, protocol_id: int, length: int, unit_id: int, function_code: int, byte_count: int, data: bytes):
         self.response_bytes = bytes
         self.transaction_id = transaction_id
@@ -8,11 +10,25 @@ class ModBusResponse:
         self.length = length
         self.unit_id = unit_id
         self.function_code = function_code
-        self.byte_count = byte_count
+        self.byte_count = byte_count # TODO: REMOVE THIS AND USE LEN(DATA)
         self.data = data
+        assert self.byte_count == len(self.data), f"BYTE COUNT MISMATCH, {self.__repr__()}"
+
+        self.register_values = self._get_register_values()
+
+
+    def _get_register_values(self):
+        registers = []
+
+        assert len(self.data) % __class__.VAL_SIZE == 0, f"DATA LENGTH MISMATCH, {self.__repr__()}"
+        for i in range(0, len(self.data), __class__.VAL_SIZE):
+            register_value = int.from_bytes(self.data[i:i+__class__.VAL_SIZE], byteorder='big')
+            registers.append(register_value)
+        return registers
+ 
 
     @staticmethod
-    def get_response(sock) -> ModBusResponse:
+    def get_response(sock) -> 'ModBusResponse':
         mbap_resp = b''
         while len(mbap_resp) < 7:
             chunk = sock.recv(7 - len(mbap_resp))

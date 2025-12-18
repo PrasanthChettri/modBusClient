@@ -5,6 +5,8 @@ class RequestType(Enum):
     readHoldingRegisters = 0x03
 
 class ModBusRequest():
+    REQUEST_FRAME_SIZE = 12
+
     def __init__(self, RequestType, start_register: int, count: int, timeout: int = 5, unit_id: int = 1):
         self.request_type = RequestType
         self.start_register = start_register

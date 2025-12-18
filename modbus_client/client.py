@@ -6,8 +6,8 @@ import socket
 import struct
 from enum import Enum
 
-from modbus_request import ModBusRequest, RequestType
-from modbus_response import ModBusResponse
+from modbus_client.request import ModBusRequest, RequestType
+from modbus_client.response import ModBusResponse
 
 class ModBusClient():
     def __init__(self, host, port=502, unit_id=1, timeout=5):
@@ -52,6 +52,7 @@ class ModBusClient():
         print("Sent (hex):", request.hex)
         print("Received (bytes):", response.bytes)
         print("Received (hex):", response.hex)
+        return response
     
 
 if __name__ == "__main__":
