@@ -1,3 +1,4 @@
+from ast import List
 import struct
 
 class ModBusResponse:
@@ -13,17 +14,20 @@ class ModBusResponse:
         self.byte_count = byte_count # TODO: REMOVE THIS AND USE LEN(DATA)
         self.data = data
         assert self.byte_count == len(self.data), f"BYTE COUNT MISMATCH, {self.__repr__()}"
+        assert len(self.data) % __class__.VAL_SIZE == 0, f"DATA LENGTH MISMATCH, {self.__repr__()}"
+        self.cache = {} 
 
-        self.register_values = self._get_register_values()
 
-
-    def _get_register_values(self):
+    @property
+    def register_values(self) -> List[int]:
+        if "register_values" in self.cache :
+            return self.cache["register_values"]
         registers = []
 
-        assert len(self.data) % __class__.VAL_SIZE == 0, f"DATA LENGTH MISMATCH, {self.__repr__()}"
         for i in range(0, len(self.data), __class__.VAL_SIZE):
             register_value = int.from_bytes(self.data[i:i+__class__.VAL_SIZE], byteorder='big')
             registers.append(register_value)
+        self.cache["register_values"] = registers
         return registers
  
 
@@ -48,10 +52,29 @@ class ModBusResponse:
             pdu_resp += chunk
 
         response = mbap_resp + pdu_resp
+        assert len(response) == length_field + 6, f"Response length mismatch: {len(response)} != {length_field + 6}"
+
         return __class__.from_bytes(response)
 
     @staticmethod
     def from_bytes(response_bytes: bytes) -> 'ModBusResponse':
+        """
+        Parse a ModBus response from bytes.
+        Converts raw bytes into a ModBusResponse object by extracting and validating
+        the MBAP (ModBus Application Protocol) header and PDU (Protocol Data Unit).
+        Args:
+            response_bytes (bytes): The raw response bytes to parse.
+        Returns:
+            ModBusResponse: A ModBusResponse object containing the parsed transaction ID,
+                           protocol ID, length, unit ID, function code, byte count, and data.
+        Raises:
+            ValueError: If response_bytes is less than 9 bytes (too short).
+            ValueError: If the PDU portion is less than 2 bytes (too short).
+        Notes:
+            - MBAP header is 7 bytes: Transaction ID (2), Protocol ID (2), Length (2), Unit ID (1)
+            - PDU starts at byte 7 and contains: Function Code (1), Byte Count (1), Data (variable)
+            - Unpacking uses big-endian byte order ('>HHHB')
+        """
         if len(response_bytes) < 9:
             raise ValueError("Response too short")
 
