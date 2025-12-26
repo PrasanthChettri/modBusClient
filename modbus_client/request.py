@@ -2,6 +2,7 @@ from enum import Enum
 import struct
 
 class RequestType(Enum):
+    readCoil = 0x01
     readHoldingRegisters = 0x03
 
 class ModBusRequest():
@@ -22,7 +23,7 @@ class ModBusRequest():
         protocol_id = 0          # Modbus protocol
 
         # Build PDU: Function (1 byte) + Start Addr (2 bytes) + Quantity (2 bytes)
-        pdu = struct.pack('>BHH', RequestType.readHoldingRegisters.value, start_addr, kwargs["count"])
+        pdu = struct.pack('>BHH', requestType.value, start_addr, kwargs["count"])
 
         # MBAP header: Transaction ID (2) | Protocol ID (2) | Length (2) | Unit ID (1)
         # Length = number of following bytes (Unit ID + PDU)
@@ -48,5 +49,6 @@ class ModBusRequest():
                                     start_register=self.start_register,
                                     count=self.count)
         return self.cache["bytes"]
+
     def __repr__(self):
         return f"ModBusRequest(type={self.request_type}, start_register={self.start_register}, count={self.count}, unit_id={self.unit_id}, timeout={self.timeout})"
